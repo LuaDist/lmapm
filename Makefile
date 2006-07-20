@@ -1,46 +1,60 @@
 # makefile for mapm binding for Lua
 
-# change this to reflect your installation
-LUA=/tmp/lua-4.0
-LUALIB= $(LUA)/lib
+# change these to reflect your Lua installation
+LUA= /tmp/lhf/lua-5.0
 LUAINC= $(LUA)/include
+LUALIB= $(LUA)/lib
+LUABIN= $(LUA)/bin
 
-MAPM=/tmp/mapm_4.3
-MAPM=.
+# change this to reflect your MAPM installation
+MAPM= /tmp/lhf/mapm_4.9.2
 
-CC= gcc
-CFLAGS= $(INCS) $(DEFS) $(WARN) -O2 -g
-WARN= -ansi -pedantic -Wall #-Wmissing-prototypes
+# no need to change anything below here
+CFLAGS= $(INCS) $(WARN) -O2 $G
+WARN= -ansi -pedantic -Wall
+INCS= -I$(LUAINC) -I$(MAPM)
 
-INCS= -I$(MAPM) -I$(LUAINC) -I.
-LIBS= -L$(MAPM) -lmapm -L$(LUALIB) -llua -llualib -lm
+MYNAME= mapm
+MYLIB= l$(MYNAME)
+T= $(MYLIB).so
+OBJS= $(MYLIB).o
+TEST= test.lua
 
-OBJS= mapmlib.o main.o
-
-T=a.out
-
-all:	$T
-
-$T:	$(OBJS)
-	$(CC) -o $@ $(OBJS) $(LIBS)
-
-clean:
-	rm -f $T $(OBJS) core
+all:	test
 
 test:	$T
-	$T test.lua
+	$(LUABIN)/lua -l$(MYNAME) $(TEST)
 
-map:
-	@@ld -o /dev/null -e main -M $(OBJS) $(LIBS) -lc | sed '/Memory/q' | sort | grep mapm
+o:	$(MYLIB).o
+
+so:	$T
+
+$T:	$(OBJS)
+	$(CC) -o $@ -shared $(OBJS) $(MAPM)/libmapm.a
+
+clean:
+	rm -f $(OBJS) $T core core.* a.out
+
+doc:
+	@echo "$(MYNAME) library:"
+	@fgrep '/**' $(MYLIB).c | cut -f2 -d/ | tr -d '*' | sort | column
 
 # distribution
 
-D=mapm
-A=$D.tar.gz
-TOTAR=Makefile,README,main.c,mapmlib.c,test.lua,test2.lua,tm.lua
+FTP= $(HOME)/public/ftp/lua/5.0
+D= $(MYNAME)
+A= $(MYLIB).tar.gz
+TOTAR= Makefile,README,$(MYLIB).c,$(MYNAME).lua,test.lua
 
 tar:	clean
 	tar zcvf $A -C .. $D/{$(TOTAR)}
 
 distr:	tar
-	mv $A ftp
+	touch -r $A .stamp
+	mv $A $(FTP)
+
+diff:	clean
+	tar zxf $(FTP)/$A
+	diff $D .
+
+# eof
