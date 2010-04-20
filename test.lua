@@ -1,6 +1,7 @@
 -- test mapm library
 
-bc=mapm		-- reuse test code from bc library
+-- reuse test code from bc library
+bc=require"mapm"
 
 ------------------------------------------------------------------------------
 print(bc.version)
@@ -118,7 +119,7 @@ print"Gregory series"
 -- http://mathworld.wolfram.com/GregorySeries.html
 bc.digits(78)
 a=bc.number(0)
-for i=1,500 do
+for i=1,1000 do
  a=a+(-1)^i*bc.inv(2*i-1)
 end
 a=-4*a
@@ -138,3 +139,5 @@ print(s)
 ------------------------------------------------------------------------------
 print""
 print(bc.version)
+
+-- eof

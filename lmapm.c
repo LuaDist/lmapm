@@ -1,8 +1,8 @@
 /*
 * lmapm.c
-* big-number library for Lua 5.0 based on the MAPM library
+* big-number library for Lua 5.1 based on the MAPM library
 * Luiz Henrique de Figueiredo <lhf@tecgraf.puc-rio.br>
-* 20 Jul 2006 14:32:10
+* 19 Apr 2010 09:05:40
 * This code is hereby placed in the public domain.
 */
 
@@ -13,18 +13,15 @@
 #include "lua.h"
 #include "lauxlib.h"
 
-#ifndef lua_boxpointer
 #define lua_boxpointer(L,u) \
 	(*(void **)(lua_newuserdata(L, sizeof(void *))) = (u))
-#define lua_unboxpointer(L,i)	(*(void **)(lua_touserdata(L, i)))
-#endif
 
 #define MYNAME		"mapm"
-#define MYVERSION	MYNAME " library for " LUA_VERSION " / Jul 2006 / "\
+#define MYVERSION	MYNAME " library for " LUA_VERSION " / Apr 2009 / "\
 			"using MAPM " MAPM_LIB_SHORT_VERSION
 #define MYTYPE		MYNAME " bignumber"
 
-static int DIGITS;
+static int DIGITS=0;
 static lua_State *LL=NULL;
 
 void M_apm_log_error_msg(int fatal, char *message)
@@ -63,10 +60,9 @@ static M_APM Bget(lua_State *L, int i)
    lua_replace(L,i);
    return x;
   }
-  case LUA_TUSERDATA:
-   if (luaL_checkudata(L,i,MYTYPE)!=NULL) return lua_unboxpointer(L,i);
+  default:
+   return *((void**)luaL_checkudata(L,i,MYTYPE));
  }
- luaL_typerror(L,i,MYTYPE);
  return NULL;
 }
 
@@ -108,12 +104,12 @@ static int Bdo3(lua_State *L, void (*f)(M_APM z, int n, M_APM x, M_APM y))
 
 static int Bdigits(lua_State *L)		/** digits([n]) */
 {
- lua_pushnumber(L,DIGITS);
+ lua_pushinteger(L,DIGITS);
  DIGITS=luaL_optint(L,1,DIGITS);
  return 1;
 }
 
-static int Bstring(lua_State *L)		/** tostring(x,[n,exp]) */
+static int Btostring(lua_State *L)		/** tostring(x,[n,exp]) */
 {
  char *s;
  M_APM a=Bget(L,1);
@@ -131,9 +127,20 @@ static int Bstring(lua_State *L)		/** tostring(x,[n,exp]) */
  return 1;
 }
 
+static int Btonumber(lua_State *L)		/** tonumber(x) */
+{
+ lua_settop(L,1);
+ lua_pushinteger(L,20);				/* enough for IEEE doubles */
+ lua_pushboolean(L,1);
+ Btostring(L);
+ lua_pushnumber(L,lua_tonumber(L,-1));
+ return 1;
+}
+
 static int Bnumber(lua_State *L)		/** number(x) */
 {
  Bget(L,1);
+ lua_settop(L,1);
  return 1;
 }
 
@@ -302,6 +309,12 @@ static int Bidiv(lua_State *L)			/** idiv(x,y) */
  return 2;
 }
 
+static int Bmod(lua_State *L)			/** mod(x,y) */
+{
+ Bidiv(L);
+ return 1;
+}
+
 static int Bpow(lua_State *L)			/** pow(x,y) */
 {
  return Bdo3(L,m_apm_pow);
@@ -311,7 +324,7 @@ static int Bcompare(lua_State *L)		/** compare(x,y) */
 {
  M_APM a=Bget(L,1);
  M_APM b=Bget(L,2);
- lua_pushnumber(L,m_apm_compare(a,b));
+ lua_pushinteger(L,m_apm_compare(a,b));
  return 1;
 }
 
@@ -334,14 +347,14 @@ static int Blt(lua_State *L)
 static int Bsign(lua_State *L)			/** sign(x) */
 {
  M_APM a=Bget(L,1);
- lua_pushnumber(L,m_apm_sign(a));
+ lua_pushinteger(L,m_apm_sign(a));
  return 1;
 }
 
 static int Bexponent(lua_State *L)		/** exponent(x) */
 {
  M_APM a=Bget(L,1);
- lua_pushnumber(L,m_apm_exponent(a));
+ lua_pushinteger(L,m_apm_exponent(a));
  return 1;
 }
 
@@ -369,7 +382,7 @@ static int Bisodd(lua_State *L)			/** isodd(x) */
 static int Bdigitsin(lua_State *L)		/** digitsin(x) */
 {
  M_APM a=Bget(L,1);
- lua_pushnumber(L,m_apm_significant_digits(a));
+ lua_pushinteger(L,m_apm_significant_digits(a));
  return 1;
 }
 
@@ -377,21 +390,24 @@ static int Bgc(lua_State *L)
 {
  M_APM a=Bget(L,1);
  m_apm_free(a);
+ lua_pushnil(L);
+ lua_setmetatable(L,1);
  return 0;
 }
 
-static const luaL_reg R[] =
+static const luaL_Reg R[] =
 {
-	{ "__add",	Badd	},
-	{ "__div",	Bdiv	},
-	{ "__eq",	Beq	},
+	{ "__add",	Badd	},		/** __add(x,y) */
+	{ "__div",	Bdiv	},		/** __div(x,y) */
+	{ "__eq",	Beq	},		/** __eq(x,y) */
 	{ "__gc",	Bgc	},
-	{ "__lt",	Blt	},
-	{ "__mul",	Bmul	},
-	{ "__pow",	Bpow	},
-	{ "__sub",	Bsub	},
-	{ "__tostring",	Bstring	},
-	{ "__unm",	Bneg	},
+	{ "__lt",	Blt	},		/** __lt(x,y) */
+	{ "__mod",	Bmod	},		/** __mod(x,y) */
+	{ "__mul",	Bmul	},		/** __mul(x,y) */
+	{ "__pow",	Bpow	},		/** __pow(x,y) */
+	{ "__sub",	Bsub	},		/** __sub(x,y) */
+	{ "__tostring",	Btostring},		/** __tostring(x) */
+	{ "__unm",	Bneg	},		/** __unm(x) */
 	{ "abs",	Babs	},
 	{ "acos",	Bacos	},
 	{ "acosh",	Bacosh	},
@@ -420,6 +436,7 @@ static const luaL_reg R[] =
 	{ "isodd",	Bisodd	},
 	{ "log",	Blog	},
 	{ "log10",	Blog10	},
+	{ "mod",	Bmod	},
 	{ "mul",	Bmul	},
 	{ "neg",	Bneg	},
 	{ "number",	Bnumber	},
@@ -433,21 +450,21 @@ static const luaL_reg R[] =
 	{ "sub",	Bsub	},
 	{ "tan",	Btan	},
 	{ "tanh",	Btanh	},
-	{ "tostring",	Bstring	},
+	{ "tonumber",	Btonumber},
+	{ "tostring",	Btostring},
 	{ NULL,		NULL	}
 };
 
 LUALIB_API int luaopen_mapm(lua_State *L)
 {
- lua_pushliteral(L,MYNAME);
  luaL_newmetatable(L,MYTYPE);
- luaL_openlib(L,NULL,R,0);
+ lua_setglobal(L,MYNAME);
+ luaL_register(L,MYNAME,R);
  lua_pushliteral(L,"version");			/** version */
  lua_pushliteral(L,MYVERSION);
  lua_settable(L,-3);
  lua_pushliteral(L,"__index");
  lua_pushvalue(L,-2);
  lua_settable(L,-3);
- lua_rawset(L,LUA_GLOBALSINDEX);
  return 1;
 }
