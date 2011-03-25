@@ -1,0 +1,15 @@
+--- This file is part of LuaDist project
+
+name = "lmapm"
+version="5.1"
+
+desc = "This is a big-number library for Lua 5.1."
+author = "Luiz Henrique de Figueiredo"
+license = "Public domain"
+url = "http://www.tecgraf.puc-rio.br/~lhf/ftp/lua/#lmapm"
+maintainer = "Peter Kapec"
+
+depends = {
+	"lua ~> 5.1",
+	"mapm >=4.9.5"
+}
